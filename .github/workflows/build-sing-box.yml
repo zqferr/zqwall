@@ -37,7 +37,7 @@ jobs:
           repository: SagerNet/sing-box
           ref: v1.11.6
 
-      - name: Build
+      - name: Build (no tags = smaller)
         env:
           GOOS: linux
           GOARCH: ${{ matrix.goarch }}
@@ -45,21 +45,19 @@ jobs:
           GOARM: ${{ matrix.goarm }}
           CGO_ENABLED: "0"
         run: |
+          # Try without tags first (often smaller for sing-box)
           go build -trimpath -ldflags="-s -w" \
-            -tags "with_vless,with_reality,with_utls,with_tproxy,with_dns" \
             -o sing-box-${{ matrix.name }} \
             ./cmd/sing-box
-          echo "Raw: $(ls -lh sing-box-${{ matrix.name }} | awk '{print $5}')"
-
-      - name: Install UPX
-        run: |
-          wget -q https://github.com/upx/upx/releases/download/v4.2.4/upx-4.2.4-amd64_linux.tar.xz
-          tar -xf upx-4.2.4-amd64_linux.tar.xz
-          sudo cp upx-4.2.4-amd64_linux/upx /usr/local/bin/
+          SIZE=$(ls -lh sing-box-${{ matrix.name }} | awk '{print $5}')
+          echo "Size: $SIZE"
 
       - name: UPX compress
         run: |
-          upx --best --lzma sing-box-${{ matrix.name }} || echo "UPX failed, keeping uncompressed"
+          UPX_URL="https://github.com/upx/upx/releases/download/v4.2.4/upx-4.2.4-amd64_linux.tar.xz"
+          wget -q "$UPX_URL" -O upx.tar.xz
+          tar -xf upx.tar.xz
+          ./upx-4.2.4-amd64_linux/upx --best --lzma sing-box-${{ matrix.name }} 2>&1 || echo "UPX skipped"
           echo "Final: $(ls -lh sing-box-${{ matrix.name }} | awk '{print $5}')"
 
       - uses: actions/upload-artifact@v4
