@@ -11,8 +11,8 @@ echo ""
 SBOX="/usr/bin/sing-box"
 CONF_DIR="/etc/zqwall"
 VAR_DIR="/var/etc/zqwall"
-GH="https://raw.githubusercontent.com/zqfer/zqwall/main"
-GH_REL="https://github.com/zqfer/zqwall/releases/download/sing-box"
+GH="https://raw.githubusercontent.com/zqferr/zqwall/main"
+GH_REL="https://github.com/zqferr/zqwall/releases/download/sing-box"
 
 # ---- Arch detect ----
 ARCH=$(uname -m)

@@ -5,7 +5,7 @@ Minimal VLESS Reality transparent proxy for OpenWrt. Uses sing-box + TPROXY.
 ## Install
 
 ```bash
-curl -sSL https://raw.githubusercontent.com/zqfer/zqwall/main/install.sh | sh
+curl -sSL https://raw.githubusercontent.com/zqferr/zqwall/main/install.sh | sh
 ```
 
 ## Usage
@@ -24,7 +24,7 @@ uci set zqwall.settings.enabled='1' && uci commit zqwall
 - DNS over HTTPS (Cloudflare)
 - Auto-bypass private IPs & proxy server
 - LuCI web interface with VLESS link import
-- ~12MB total (sing-box binary)
+- ~5-6MB total (custom minimal sing-box, VLESS Reality + TPROXY + DNS only)
 
 ## Requirements
 
