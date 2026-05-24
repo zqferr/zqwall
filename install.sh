@@ -225,13 +225,18 @@ start_service() {
     ensure_sbox || { echo "zqwall: sing-box download failed"; return 1; }
     [ -x "$GENCONF" ] && "$GENCONF"
     [ ! -f "$CONF" ] && { echo "Config not found"; return 1; }
-    setup_nft
+
+    # Start sing-box first so TPROXY ports are listening
     procd_open_instance
     procd_set_param command "$PROG" run -c "$CONF"
     procd_set_param file "$CONF"
     procd_set_param respawn 3600 5 60
     procd_set_param stdout 1; procd_set_param stderr 1
     procd_close_instance
+
+    # Wait for ports to be ready, then add nft rules
+    sleep 3
+    setup_nft
 }
 
 stop_service() { teardown_nft; service_stop "$PROG"; }
