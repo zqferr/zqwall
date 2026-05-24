@@ -24,7 +24,7 @@ uci set zqwall.settings.enabled='1' && uci commit zqwall
 - DNS over HTTPS (Cloudflare)
 - Auto-bypass private IPs & proxy server
 - LuCI web interface with VLESS link import
-- ~5-6MB total (custom minimal sing-box, VLESS Reality + TPROXY + DNS only)
+- ~12MB (official sing-box binary)
 
 ## Requirements
 

@@ -12,7 +12,6 @@ SBOX="/usr/bin/sing-box"
 CONF_DIR="/etc/zqwall"
 VAR_DIR="/var/etc/zqwall"
 GH="https://raw.githubusercontent.com/zqferr/zqwall/main"
-GH_REL="https://github.com/zqferr/zqwall/releases/download/sing-box"
 
 # ---- Arch detect ----
 ARCH=$(uname -m)
@@ -32,19 +31,16 @@ for pkg in kmod-nft-tproxy; do
     opkg list-installed "$pkg" >/dev/null 2>&1 || opkg install "$pkg" >/dev/null 2>&1 || true
 done
 
-# ---- Install sing-box (custom minimal build) ----
-echo "[2/4] Installing sing-box (VLESS-only, ~5MB)..."
+# ---- Install sing-box ----
+echo "[2/4] Installing sing-box..."
 if [ ! -x "$SBOX" ]; then
-    SBOX_URL="$GH_REL/sing-box-${SBOX_ARCH}"
-    wget -q -O "$SBOX" "$SBOX_URL" || {
-        # Fallback: official build
-        echo "     Custom build not found, trying official..."
-        SBOX_VER="1.11.6"
-        wget -q -O - "https://github.com/SagerNet/sing-box/releases/download/v${SBOX_VER}/sing-box-${SBOX_VER}-linux-${SBOX_ARCH}.tar.gz" | tar -xz -C /tmp
-        cp "/tmp/sing-box-${SBOX_VER}-linux-${SBOX_ARCH}/sing-box" "$SBOX"
-        rm -rf "/tmp/sing-box-${SBOX_VER}-linux-${SBOX_ARCH}"
-    }
+    SBOX_VER="1.11.6"
+    SBOX_URL="https://github.com/SagerNet/sing-box/releases/download/v${SBOX_VER}/sing-box-${SBOX_VER}-linux-${SBOX_ARCH}.tar.gz"
+    echo "     Downloading sing-box v${SBOX_VER} for ${SBOX_ARCH}..."
+    wget -q -O - "$SBOX_URL" | tar -xz -C /tmp
+    cp "/tmp/sing-box-${SBOX_VER}-linux-${SBOX_ARCH}/sing-box" "$SBOX"
     chmod +x "$SBOX"
+    rm -rf "/tmp/sing-box-${SBOX_VER}-linux-${SBOX_ARCH}"
 fi
 echo "     sing-box: $($SBOX version 2>&1 | head -1)"
 
