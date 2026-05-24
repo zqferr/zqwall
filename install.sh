@@ -8,7 +8,7 @@ echo "  zqwall — VLESS Reality Proxy"
 echo "  ============================="
 echo ""
 
-SBOX="/usr/bin/sing-box"
+SBOX="/tmp/zqwall/sing-box"
 CONF_DIR="/etc/zqwall"
 VAR_DIR="/var/etc/zqwall"
 GH="https://raw.githubusercontent.com/zqferr/zqwall/main"
@@ -31,18 +31,10 @@ for pkg in kmod-nft-tproxy; do
     opkg list-installed "$pkg" >/dev/null 2>&1 || opkg install "$pkg" >/dev/null 2>&1 || true
 done
 
-# ---- Install sing-box ----
-echo "[2/4] Installing sing-box..."
-if [ ! -x "$SBOX" ]; then
-    SBOX_VER="1.11.6"
-    SBOX_URL="https://github.com/SagerNet/sing-box/releases/download/v${SBOX_VER}/sing-box-${SBOX_VER}-linux-${SBOX_ARCH}.tar.gz"
-    echo "     Downloading sing-box v${SBOX_VER} for ${SBOX_ARCH}..."
-    wget -q -O - "$SBOX_URL" | tar -xz -C /tmp
-    cp "/tmp/sing-box-${SBOX_VER}-linux-${SBOX_ARCH}/sing-box" "$SBOX"
-    chmod +x "$SBOX"
-    rm -rf "/tmp/sing-box-${SBOX_VER}-linux-${SBOX_ARCH}"
-fi
-echo "     sing-box: $($SBOX version 2>&1 | head -1)"
+# ---- Install sing-box (RAM-based, downloads on first boot) ----
+echo "[2/4] sing-box will be downloaded to RAM on first start"
+echo "     (saves ~12MB flash, uses /tmp RAM)"
+mkdir -p /tmp/zqwall
 
 # ---- Create files ----
 echo "[3/4] Creating config files..."
@@ -164,10 +156,31 @@ cat > /etc/init.d/zqwall << 'INIT'
 USE_PROCD=1
 START=90
 STOP=10
-PROG=/usr/bin/sing-box
+PROG=/tmp/zqwall/sing-box
 CONF=/var/etc/zqwall/config.json
 GENCONF=/usr/libexec/zqwall/gen-config.sh
+SBOX_VER="1.11.6"
 NFT="inet zqwall"
+
+ensure_sbox() {
+    if [ -x "$PROG" ]; then return 0; fi
+    local arch
+    case $(uname -m) in
+        x86_64)   arch="amd64" ;;
+        aarch64)  arch="arm64" ;;
+        armv7l)   arch="armv7" ;;
+        mips)     arch="mips" ;;
+        mipsel)   arch="mipsle" ;;
+        *) echo "zqwall: unknown arch"; return 1 ;;
+    esac
+    echo "zqwall: downloading sing-box to RAM..."
+    mkdir -p /tmp/zqwall
+    wget -q -O - "https://github.com/SagerNet/sing-box/releases/download/v${SBOX_VER}/sing-box-${SBOX_VER}-linux-${arch}.tar.gz" | tar -xz -C /tmp/zqwall
+    mv "/tmp/zqwall/sing-box-${SBOX_VER}-linux-${arch}/sing-box" "$PROG"
+    chmod +x "$PROG"
+    rm -rf "/tmp/zqwall/sing-box-${SBOX_VER}-linux-${arch}"
+    echo "zqwall: sing-box ready"
+}
 
 setup_nft() {
     local tp dp addr
@@ -207,7 +220,8 @@ start_service() {
     config_load zqwall
     config_get enabled settings enabled
     [ "$enabled" != "1" ] && { echo "zqwall disabled: uci set zqwall.settings.enabled=1"; return 1; }
-    mkdir -p /var/etc/zqwall
+    mkdir -p /var/etc/zqwall /tmp/zqwall
+    ensure_sbox || { echo "zqwall: sing-box download failed"; return 1; }
     [ -x "$GENCONF" ] && "$GENCONF"
     [ ! -f "$CONF" ] && { echo "Config not found"; return 1; }
     setup_nft
