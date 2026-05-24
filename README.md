@@ -5,7 +5,7 @@ Minimal VLESS Reality transparent proxy for OpenWrt. Uses sing-box + TPROXY.
 ## Install
 
 ```bash
-curl -sSL https://raw.githubusercontent.com/zqferr/zqwall/main/install.sh | sh
+wget -qO- https://raw.githubusercontent.com/zqferr/zqwall/main/install.sh | sh
 ```
 
 ## Usage
