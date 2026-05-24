@@ -27,7 +27,7 @@ esac
 # ---- Install dependencies ----
 echo "[1/4] Installing dependencies..."
 opkg update >/dev/null 2>&1 || true
-for pkg in kmod-nft-tproxy; do
+for pkg in kmod-ipt-tproxy; do
     opkg list-installed "$pkg" >/dev/null 2>&1 || opkg install "$pkg" >/dev/null 2>&1 || true
 done
 
@@ -182,36 +182,52 @@ ensure_sbox() {
     echo "zqwall: sing-box ready"
 }
 
-setup_nft() {
+setup_tproxy() {
     local tp dp addr
-    modprobe nf_tproxy 2>/dev/null || true
+    modprobe xt_TPROXY 2>/dev/null || true
     . /lib/functions.sh
     config_load zqwall
     config_get tp settings tproxy_port; [ -z "$tp" ] && tp="10105"
     config_get dp settings dns_port;    [ -z "$dp" ] && dp="10153"
     config_get addr settings address
 
-    nft add table $NFT 2>/dev/null
-    nft add set $NFT bypass_v4 { type ipv4_addr\; flags interval\; } 2>/dev/null
-    nft add element $NFT bypass_v4 { 10.0.0.0/8, 172.16.0.0/12, 192.168.0.0/16, 127.0.0.0/8, 224.0.0.0/4 } 2>/dev/null
-    nft add set $NFT bypass_dst { type ipv4_addr\; } 2>/dev/null
+    # Resolve proxy server IP for bypass
     for ip in $(nslookup "$addr" 2>/dev/null | awk '/^Address/{print $2}' | grep -v ':'); do
-        nft add element $NFT bypass_dst { "$ip" } 2>/dev/null
+        iptables -t mangle -I ZQWALL -d "$ip" -j RETURN 2>/dev/null
     done
-    nft add chain $NFT prerouting { type filter hook prerouting priority mangle\; } 2>/dev/null
-    nft flush chain $NFT prerouting
-    nft add rule $NFT prerouting ip daddr @bypass_v4 return
-    nft add rule $NFT prerouting ip daddr @bypass_dst return
-    nft add rule $NFT prerouting ip protocol udp udp dport 53 meta mark set 1 tproxy ip to :$dp accept
-    nft add rule $NFT prerouting ip protocol tcp tcp dport 53 meta mark set 1 tproxy ip to :$dp accept
-    nft add rule $NFT prerouting ip protocol tcp meta mark set 1 tproxy ip to :$tp accept
-    nft add rule $NFT prerouting ip protocol udp meta mark set 1 tproxy ip to :$tp accept
+
+    # iptables TPROXY rules
+    iptables -t mangle -N ZQWALL 2>/dev/null
+    iptables -t mangle -F ZQWALL
+
+    # Bypass private IPs
+    iptables -t mangle -A ZQWALL -d 10.0.0.0/8 -j RETURN
+    iptables -t mangle -A ZQWALL -d 172.16.0.0/12 -j RETURN
+    iptables -t mangle -A ZQWALL -d 192.168.0.0/16 -j RETURN
+    iptables -t mangle -A ZQWALL -d 127.0.0.0/8 -j RETURN
+    iptables -t mangle -A ZQWALL -d 224.0.0.0/4 -j RETURN
+
+    # DNS to TPROXY
+    iptables -t mangle -A ZQWALL -p udp --dport 53 -j TPROXY --on-port $dp --tproxy-mark 1
+    iptables -t mangle -A ZQWALL -p tcp --dport 53 -j TPROXY --on-port $dp --tproxy-mark 1
+
+    # All TCP/UDP to TPROXY
+    iptables -t mangle -A ZQWALL -p tcp -j TPROXY --on-port $tp --tproxy-mark 1
+    iptables -t mangle -A ZQWALL -p udp -j TPROXY --on-port $tp --tproxy-mark 1
+
+    # Attach to PREROUTING
+    iptables -t mangle -D PREROUTING -j ZQWALL 2>/dev/null
+    iptables -t mangle -A PREROUTING -j ZQWALL
+
+    # Policy routing
     ip rule add fwmark 1 table 100 2>/dev/null
     ip route add local 0.0.0.0/0 dev lo table 100 2>/dev/null
 }
 
-teardown_nft() {
-    nft delete table $NFT 2>/dev/null
+teardown_tproxy() {
+    iptables -t mangle -D PREROUTING -j ZQWALL 2>/dev/null
+    iptables -t mangle -F ZQWALL 2>/dev/null
+    iptables -t mangle -X ZQWALL 2>/dev/null
     ip rule del fwmark 1 table 100 2>/dev/null
     ip route flush table 100 2>/dev/null
 }
@@ -236,13 +252,13 @@ start_service() {
 
     # Wait for ports to be ready, then add nft rules
     sleep 3
-    setup_nft
+    setup_tproxy
 }
 
-stop_service() { teardown_nft; service_stop "$PROG"; }
+stop_service() { teardown_tproxy; service_stop "$PROG"; }
 reload_service() {
     [ -x "$GENCONF" ] && "$GENCONF"
-    teardown_nft; setup_nft
+    teardown_tproxy; setup_tproxy
     procd_send_signal zqwall SIGHUP
 }
 INIT
