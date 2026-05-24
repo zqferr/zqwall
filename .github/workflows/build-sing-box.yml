@@ -37,7 +37,7 @@ jobs:
           repository: SagerNet/sing-box
           ref: v1.11.6
 
-      - name: Build (no tags = smaller)
+      - name: Build
         env:
           GOOS: linux
           GOARCH: ${{ matrix.goarch }}
@@ -45,20 +45,25 @@ jobs:
           GOARM: ${{ matrix.goarm }}
           CGO_ENABLED: "0"
         run: |
-          # Try without tags first (often smaller for sing-box)
-          go build -trimpath -ldflags="-s -w" \
+          go build -v -trimpath -ldflags="-s -w" \
             -o sing-box-${{ matrix.name }} \
-            ./cmd/sing-box
-          SIZE=$(ls -lh sing-box-${{ matrix.name }} | awk '{print $5}')
-          echo "Size: $SIZE"
+            ./cmd/sing-box 2>&1 | tail -5
+          ls -lh sing-box-${{ matrix.name }}
 
-      - name: UPX compress
+      - name: UPX
         run: |
-          UPX_URL="https://github.com/upx/upx/releases/download/v4.2.4/upx-4.2.4-amd64_linux.tar.xz"
-          wget -q "$UPX_URL" -O upx.tar.xz
+          set -e
+          echo "--- Downloading UPX ---"
+          curl -sSLo upx.tar.xz https://github.com/upx/upx/releases/download/v4.2.4/upx-4.2.4-amd64_linux.tar.xz
           tar -xf upx.tar.xz
-          ./upx-4.2.4-amd64_linux/upx --best --lzma sing-box-${{ matrix.name }} 2>&1 || echo "UPX skipped"
-          echo "Final: $(ls -lh sing-box-${{ matrix.name }} | awk '{print $5}')"
+          echo "--- UPX version ---"
+          ./upx-4.2.4-amd64_linux/upx --version
+          echo "--- Before UPX ---"
+          ls -lh sing-box-${{ matrix.name }}
+          echo "--- Compressing ---"
+          ./upx-4.2.4-amd64_linux/upx --best --lzma sing-box-${{ matrix.name }}
+          echo "--- After UPX ---"
+          ls -lh sing-box-${{ matrix.name }}
 
       - uses: actions/upload-artifact@v4
         with:
@@ -75,15 +80,14 @@ jobs:
           merge-multiple: true
           path: binaries
 
-      - name: Show binaries
-        run: ls -lh binaries/
+      - run: ls -lh binaries/
 
-      - name: Create Release
+      - name: Release
         uses: softprops/action-gh-release@v2
         with:
           name: "sing-box minimal (UPX)"
           tag_name: "sing-box"
-          body: "Minimal sing-box build (VLESS Reality + TPROXY + DNS) with UPX compression."
+          body: "sing-box v1.11.6 with UPX compression."
           files: binaries/*
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
