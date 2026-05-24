@@ -169,8 +169,8 @@ ensure_sbox() {
         x86_64)   arch="amd64" ;;
         aarch64)  arch="arm64" ;;
         armv7l)   arch="armv7" ;;
-        mips)     arch="mips" ;;
         mipsel)   arch="mipsle" ;;
+        mips)     arch="mipsle" ;;  # Xiaomi 4A etc are mipsle
         *) echo "zqwall: unknown arch"; return 1 ;;
     esac
     echo "zqwall: downloading sing-box to RAM..."
@@ -184,6 +184,7 @@ ensure_sbox() {
 
 setup_nft() {
     local tp dp addr
+    modprobe nf_tproxy 2>/dev/null || true
     . /lib/functions.sh
     config_load zqwall
     config_get tp settings tproxy_port; [ -z "$tp" ] && tp="10105"
